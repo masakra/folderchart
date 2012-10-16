@@ -13,6 +13,7 @@
 
 class QListWidget;
 class QTreeWidget;
+class QTreeWidgetItem;
 
 class FormMain : public QMainWindow
 {
@@ -29,7 +30,7 @@ class FormMain : public QMainWindow
 
 		QString currentPath;
 
-		void processPath( const QString & path );
+		QTreeWidgetItem * processPath( const QString & path );
 
 		void dbClear() const;
 

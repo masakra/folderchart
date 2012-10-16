@@ -67,9 +67,10 @@ FormMain::setCurrentPath( QString newPath )
 
 	currentPath = newPath;
 
+	tree->clear();
 	dbClear();
 
-	processPath( currentPath );
+	tree->addTopLevelItem( processPath( currentPath ) );
 }
 
 void
@@ -82,7 +83,7 @@ FormMain::selectCurrentPath()
 		setCurrentPath( dir );
 }
 
-void
+QTreeWidgetItem *
 FormMain::processPath( const QString & path )
 {
 	qDebug() << "processPath" << path;
@@ -90,15 +91,20 @@ FormMain::processPath( const QString & path )
 	QDir dir( path );
 
 	if ( ! dir.exists() )
-		return;
+		return 0;
+
+	QTreeWidgetItem * item = new QTreeWidgetItem();
+	item->setText( 0, dir.dirName() );
 
 	QFileInfoList list = dir.entryInfoList( QDir::AllDirs | QDir::NoDotAndDotDot , QDir::Name );
 
 	for ( int i = 0; i < list.size(); ++i ) {
 		qDebug() << i << list[ i ].fileName();
 
-		processPath( list[ i ].absoluteFilePath() );
+		item->addChild( processPath( list[ i ].absoluteFilePath() ) );
 	}
+
+	return item;
 }
 
 void
