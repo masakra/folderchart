@@ -3,6 +3,7 @@
 
 #include <QtGui>
 #include <QtSql>
+#include "Chart.h"
 
 #ifdef DEBUG
 #include <QDebug>
@@ -13,10 +14,12 @@ FormMain::FormMain( QWidget * parent )
 {
 #ifdef DEBUG
 	connect( this, SIGNAL( yell( const QString & ) ), SLOT( yellDebug( const QString & ) ) );
-	emit yell( "is begugging!!!" );
+	emit yell( "is debugging!!!" );
 #endif
 
 	createWidgets();
+
+	createToolBar();
 
 	QSqlDatabase sqlite3 = QSqlDatabase::addDatabase("QSQLITE");	// Sqlite3 database
 
@@ -39,21 +42,38 @@ FormMain::createWidgets()
 {
 	tree = new QTreeWidget( this );
 
-	list = new QListWidget( this );
+	editInfo = new QTextEdit( this );
 
-	chart = new QWidget( this ); // TODO replace with Chart
+	connect( tree, SIGNAL( currentItemChanged( QTreeWidgetItem *, QTreeWidgetItem * ) ),
+			SLOT( folderChanged( QTreeWidgetItem *, QTreeWidgetItem * ) ) );
 
+	listExc = new QListWidget( this );
+
+	chart = new Chart( this );
 
 	QSplitter * splitterHor = new QSplitter( Qt::Horizontal, this ),
 			  * splitterVer = new QSplitter( Qt::Vertical, this );
 
-	splitterVer->addWidget( list );
+	splitterVer->addWidget( listExc );
 	splitterVer->addWidget( chart );
 
 	splitterHor->addWidget( tree );
+	splitterHor->addWidget( editInfo );
 	splitterHor->addWidget( splitterVer );
 
 	setCentralWidget( splitterHor );
+}
+
+void
+FormMain::createToolBar()
+{
+	QToolBar * toolBar = addToolBar("");
+
+	toolBar->addAction( QIcon(":/blue.png"), tr("set current path"),
+			this, SLOT( selectCurrentPath() ) );
+
+	toolBar->addAction( QIcon(":/red.png"), tr("add exclude folder"),
+			this, SLOT( selectExcludeFolder() ) );
 }
 
 void
@@ -71,39 +91,125 @@ FormMain::setCurrentPath( QString newPath )
 
 	dbClear();
 
-	tree->addTopLevelItem( processPath( currentPath ) );
+	qint64 commonSize = 0;
+
+
+	qApp->setOverrideCursor( Qt::WaitCursor );
+
+	QTreeWidgetItem * rootItem = processPath( currentPath, commonSize );
+
+	qApp->restoreOverrideCursor();
+
+	if ( rootItem )
+		tree->addTopLevelItem( rootItem );
+}
+
+void
+FormMain::addExcludeFolder( QString path )
+{
+	QDir dir( path );
+
+	if ( ! dir.exists() )
+		return;
+
+	QListWidgetItem * item = new QListWidgetItem( dir.dirName() );
+	item->setIcon( QIcon(":/red.png") );
+	item->setData( Qt::ToolTipRole, dir.canonicalPath() );
+
+	listExc->addItem( item );
+
+	// renew tree
+
+	QString cp = currentPath;
+
+	currentPath.clear();
+
+	setCurrentPath( cp );
 }
 
 void
 FormMain::selectCurrentPath()
 {
-	QString dir = QFileDialog::getExistingDirectory( this, tr("Select directory"),
+	QString dir = QFileDialog::getExistingDirectory( this, tr("Select current directory"),
 			currentPath );
 
 	if ( ! dir.isEmpty() )
 		setCurrentPath( dir );
 }
 
+void
+FormMain::selectExcludeFolder()
+{
+	QString dir = QFileDialog::getExistingDirectory( this, tr("Select exclude directory"),
+			currentPath );
+
+	if ( ! dir.isEmpty() )
+		addExcludeFolder( dir );
+}
+
 QTreeWidgetItem *
-FormMain::processPath( const QString & path, int parent_id )
+FormMain::processPath( const QString & path, qint64 & dirSize, int parent_id )
 {
 	QDir dir( path );
 
 	if ( ! dir.exists() )
 		return 0;
 
-	dbSaveFolder( dir, parent_id );
+	const int dbDirId = dbSaveFolder( dir, parent_id );
+
+	if ( dbDirId == -1 )
+		return 0;
 
 	QTreeWidgetItem * item = new QTreeWidgetItem();
+	item->setIcon( 0, QIcon(":/blue.png" ) );
 	item->setText( 0, dir.dirName() );
+	item->setData( 0, Qt::UserRole, dbDirId );
 
+	qint64 dir_size = 0;
+
+	// folders
 	QFileInfoList list = dir.entryInfoList( QDir::AllDirs | QDir::NoDotAndDotDot , QDir::Name );
 
-	for ( int i = 0; i < list.size(); ++i ) {
-		qDebug() << i << list[ i ].fileName();
+	const int dirCount = list.size();
 
-		item->addChild( processPath( list[ i ].absoluteFilePath() ) );
+	for ( int i = 0; i < list.size(); ++i ) {
+
+		if ( exclude( list[ i ] ) )
+			continue;
+
+		item->addChild( processPath( list[ i ].absoluteFilePath(), dir_size, dbDirId ) );
 	}
+
+	// files
+	list = dir.entryInfoList( QDir::Files | QDir::Hidden | QDir::System, QDir::Type );
+
+#ifdef DEBUG
+	qDebug() << "files count: " << dir.dirName() << list.size();
+#endif
+
+	for ( int i = 0; i < list.size(); ++ i ) {
+		dbSaveFile( list[ i ], dbDirId );
+
+		dir_size += list[ i ].size();
+	}
+
+	// percents
+	QHash< QString, int > counts;
+
+	for ( int i = 0; i < list.size(); ++i ) {
+		const QString suffix = list[ i ].suffix();
+
+		if ( counts.contains( suffix ) )
+			counts[ suffix ] += 1;
+		else
+			counts[ suffix ] = 1;
+	}
+
+	dbSavePercents( counts, dbDirId, dirCount + list.size() );
+
+	dbSaveFolderSize( dbDirId, dir_size );
+
+	dirSize += dir_size;
 
 	return item;
 }
@@ -125,13 +231,261 @@ FormMain::dbClear() const
 			emit yell( q.lastError().text() );
 			break;
 		}
-
-
 	}
-
 }
 
 int
-FormMain::dbSaveFolder( const QString & dir, int parent_id )
+FormMain::dbSaveFolder( const QDir & dir, int parent_id ) const
 {
+	QSqlQuery q;
+
+	q.prepare("INSERT INTO folders ("
+			"parent_id, "
+			"name, "
+			"path, "
+			"size "
+		") VALUES ("
+			":pid, "
+			":nam, "
+			":pat, "
+			":siz )");
+
+	q.bindValue(":pid", parent_id );
+	q.bindValue(":nam", dir.dirName() );
+	q.bindValue(":pat", dir.absolutePath() );
+	q.bindValue(":siz", 0 );		// void dbSaveFolderSize( int folder_id, qint64 size ) const
+
+	if ( q.exec() ) {
+		q.prepare("SELECT last_insert_rowid()");
+
+		if ( q.exec() &&
+				q.first() ) {
+			return q.value( 0 ).toInt();
+
+		} else {
+			emit yell( q.lastError().text() );
+			return -1;
+		}
+
+	} else {
+		emit yell( q.lastError().text() );
+		return -1;
+	}
 }
+
+int
+FormMain::dbSaveFile( const QFileInfo & fileInfo, int folder_id ) const
+{
+	QSqlQuery q;
+
+	q.prepare("INSERT INTO files ("
+			"folders_id, "
+			"name, "
+			"size "
+		") VALUES ("
+			":fid, "
+			":nam, "
+			":siz )");
+
+	q.bindValue(":fid", folder_id );
+	q.bindValue(":nam", fileInfo.fileName() );
+	q.bindValue(":siz", fileInfo.size() );
+
+	if ( q.exec() ) {
+		q.prepare("SELECT last_insert_rowid()");
+
+		if ( q.exec() &&
+				q.first() ) {
+			return q.value( 0 ).toInt();
+
+		} else {
+			emit yell( q.lastError().text() );
+			return -1;
+		}
+
+	} else {
+		emit yell( q.lastError().text() );
+		return -1;
+	}
+}
+
+void
+FormMain::dbSaveFolderSize( int folder_id, qint64 size ) const
+{
+	QSqlQuery q;
+
+	q.prepare("UPDATE folders SET "
+			"size = :siz "
+		"WHERE "
+			"id = :id ");
+
+	q.bindValue(":siz", size );
+	q.bindValue(":id", folder_id );
+
+	if ( ! q.exec() )
+		emit yell( q.lastError().text() );
+}
+
+void
+FormMain::dbSavePercents( const QHash< QString, int > & counts, int folder_id, int count ) const
+{
+	QSqlQuery q;
+
+	QHash< QString, int >::const_iterator ci = counts.constBegin();
+
+	while ( ci != counts.constEnd() ) {
+
+		q.prepare("INSERT INTO percents ("
+				"folders_id, "
+				"type, "
+				"quantity, "
+				"percent "
+			") VALUES ("
+				":fid, "
+				":typ, "
+				":qua, "
+				":per )");
+
+		q.bindValue(":fid", folder_id );
+		q.bindValue(":typ", ci.key() );
+		q.bindValue(":qua", ci.value() );
+		q.bindValue(":per", ci.value() / (qreal) count * 100. );
+
+		if ( ! q.exec() ) {
+			emit yell( q.lastError().text() );
+			break;
+		}
+
+		++ci;
+	}
+}
+
+void
+FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
+{
+	editInfo->clear();
+
+	if ( ! current )
+		return;
+
+	const int folder_id = current->data( 0, Qt::UserRole ).toInt();
+
+	QString text("Folder: ");
+
+	QSqlQuery q;
+
+	// self
+	q.prepare("SELECT "
+			"name, "
+			"path, "
+			"size "
+		"FROM "
+			"folders "
+		"WHERE "
+			"id = :id ");
+
+	q.bindValue(":id", folder_id );
+
+	if ( q.exec() && q.first() ) {
+
+		text += q.value( 0 ).toString() + "<BR>" +
+			"Path: " + q.value( 1 ).toString() + "<BR>" +
+			"Size: " + q.value( 2 ).toString() + "<BR>" +
+			QString( 50, '-' ) + "<BR>";		// horizontal line -------
+
+	} else {
+		emit yell( q.lastError().text() );
+		return;
+	}
+
+	// folders
+	text += "<BR><B>folders:</B><BR>";
+
+	q.prepare("SELECT "
+			"name, "
+			"size "
+		"FROM "
+			"folders "
+		"WHERE "
+			"parent_id = :id "
+		"ORDER BY "
+			"size DESC");
+
+	q.bindValue(":id", folder_id );
+
+	if ( q.exec() ) {
+		while ( q.next() )
+			text += q.value( 0 ).toString() +
+				" (" + q.value( 1 ).toString() + ")<BR>";
+
+	} else {
+		emit yell( q.lastError().text() );
+		return;
+	}
+
+	// files
+	text += "<BR><B>files:</B><BR>";
+
+	q.prepare("SELECT "
+			"name, "
+			"size "
+		"FROM "
+			"files "
+		"WHERE "
+			"folders_id = :id "
+		"ORDER BY "
+			"size DESC");
+
+	q.bindValue(":id", folder_id );
+
+	if ( q.exec() ) {
+		while ( q.next() )
+			text += q.value( 0 ).toString() +
+				" (" + q.value( 1 ).toString() + ")<BR>";
+
+	} else {
+		emit yell( q.lastError().text() );
+		return;
+	}
+
+	// chart
+	q.prepare("SELECT "
+			"type, "
+			"percent "
+		"FROM "
+			"percents "
+		"WHERE "
+			"folders_id = :id");
+
+	q.bindValue(":id", folder_id );
+
+	if ( q.exec() ) {
+
+		chart->clear();
+
+		while ( q.next() )
+			chart->addPiece( q.value( 1 ).toReal(), q.value( 0 ).toString() );
+
+	} else {
+		emit yell( q.lastError().text() );
+		return;
+	}
+
+
+	editInfo->setHtml( text );
+}
+
+bool
+FormMain::exclude( const QFileInfo & fileInfo ) const
+{
+	const QString dirName = fileInfo.absoluteFilePath();
+
+	for ( int i = 0; i < listExc->count(); ++i )
+		if ( listExc->item( i )->data( Qt::ToolTipRole ).toString() == dirName )
+			return true;
+
+	return false;
+}
+
+
+

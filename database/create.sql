@@ -26,7 +26,8 @@ DROP TABLE IF EXISTS percents;
 CREATE TABLE percents (
 	id				INTEGER PRIMARY KEY,
 	folders_id		INTEGER NOT NULL,
-	type			TEXT NOT NULL,
+	---type			TEXT NOT NULL,
+	type			TEXT,
 	quantity		INTEGER NOT NULL,
 	percent			REAL,
 	FOREIGN KEY ( folders_id ) REFERENCES folders ( id )

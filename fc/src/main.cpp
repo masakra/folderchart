@@ -17,8 +17,6 @@ main( int argc, char ** argv )
 	else
 		fm.setCurrentPath();
 
-	fm.selectCurrentPath();
-
 	app.exec();
 }
 

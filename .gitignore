@@ -4,4 +4,3 @@ moc_*
 *.pro
 *.o
 Makefile
-fc
