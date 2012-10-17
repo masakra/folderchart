@@ -30,11 +30,12 @@ class FormMain : public QMainWindow
 
 		QString currentPath;
 
-		QTreeWidgetItem * processPath( const QString & path );
+		QTreeWidgetItem * processPath( const QString & path,
+				int parent_id = -1 );
 
 		void dbClear() const;
 
-		int dbSaveFolder( const QString & folder, int parent_id );
+		int dbSaveFolder( const QDir & dir, int parent_id );
 
 	public:
 		FormMain( QWidget * parent = 0 );

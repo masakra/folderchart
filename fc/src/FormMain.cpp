@@ -68,6 +68,7 @@ FormMain::setCurrentPath( QString newPath )
 	currentPath = newPath;
 
 	tree->clear();
+
 	dbClear();
 
 	tree->addTopLevelItem( processPath( currentPath ) );
@@ -84,14 +85,14 @@ FormMain::selectCurrentPath()
 }
 
 QTreeWidgetItem *
-FormMain::processPath( const QString & path )
+FormMain::processPath( const QString & path, int parent_id )
 {
-	qDebug() << "processPath" << path;
-
 	QDir dir( path );
 
 	if ( ! dir.exists() )
 		return 0;
+
+	dbSaveFolder( dir, parent_id );
 
 	QTreeWidgetItem * item = new QTreeWidgetItem();
 	item->setText( 0, dir.dirName() );
@@ -131,6 +132,6 @@ FormMain::dbClear() const
 }
 
 int
-FormMain::dbSaveFolder( const QString & folder, int parent_id )
+FormMain::dbSaveFolder( const QString & dir, int parent_id )
 {
 }
