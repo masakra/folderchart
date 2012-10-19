@@ -27,43 +27,124 @@ class FormMain : public QMainWindow
 	private:
 		void createWidgets();
 
-		void createToolBar();
+		/** \fn void createToolBar()
+		 *
+		 * \brief Creates tool bar
+		 *
+		 * For demonstration only. Without this call slots selectCurrentPath()
+		 * and selectExcludeFolder().
+		 *
+		 * \sa void selectCurrentPath(), void selectExcludeFolder()
+		 */
+		//void createToolBar();
 
 		QTreeWidget * tree;
 
 		QTextEdit * editInfo;
 
-		QListWidget * listExc;
+		//QListWidget * listExc;
 
 		Chart * chart;
 
 		QString currentPath;
 
-		QTreeWidgetItem * processPath( const QString & path, qint64 & dirSize, int parent_id = -1 );
+		/** \fn QTreeWidgetItem * processPath( const QString & path, qint64 & dirSize,
+		 * const QListWidget & exc, int parent_id = -1 )
+		 *
+		 * \brief Creates tree item for folder
+		 *
+		 * Creates tree item for folder by \a path. \a dirSize is a reference for
+		 * parent folder size variable. \a parent_id is a ID in sqlite3 table 'folders'.
+		 * Calls recursively!
+		 *
+		 * \return Tree item
+		 */
+		QTreeWidgetItem * processPath( const QString & path, qint64 & dirSize,
+				const QListWidget & exc, int parent_id = -1 );
 
+		/** \fn void dbClear() const
+		 *
+		 * \brief Clear sqlite3 database
+		 *
+		 * Deletes all data from tables 'folders', 'files' and 'percents'.
+		 */
 		void dbClear() const;
 
+		/** \fn int dbSaveFolder( const QDir & dir, int parent_id ) const
+		 *
+		 * \brief Make a database record for directory
+		 *
+		 * Saves all information for \a dir into table 'folders' but size unavailable at the
+		 * moment. Size information saves later by void dbSaveFolderSize( int folder_id,
+		 * qint64 size ) const.
+		 *
+		 * \sa void dbSaveFolderSize( int folder_id, qint64 size ) const
+		 *
+		 * \return Folder ID in table 'folders'
+		 */
 		int dbSaveFolder( const QDir & dir, int parent_id ) const;
 
+		/** \fn int dbSaveFile( const QFileInfo & fileInfo, int folder_id ) const
+		 *
+		 * \brief Saves all information for file
+		 *
+		 * Saves all information for file described by \a fileInfo.
+		 *
+		 * \return File ID in table 'files'
+		 */
 		int dbSaveFile( const QFileInfo & fileInfo, int folder_id ) const;
 
+		/** \fn void dbSavePercents( const QHash< QString, int > & counts, int folder_id, int count ) const
+		 *
+		 * \brief Saves percents for file types
+		 *
+		 * Saves percents for file types into table 'percents'.
+		 */
 		void dbSavePercents( const QHash< QString, int > & counts, int folder_id, int count ) const;
 
+		/** \fn void dbSaveFolderSize( int folder_id, qint64 size ) const
+		 *
+		 * \brief Update record for folder with size information
+		 *
+		 * Update record for folder \a folder_id with size information.
+		 */
 		void dbSaveFolderSize( int folder_id, qint64 size ) const;
 
-		bool exclude( const QFileInfo & fileInfo ) const;
+		/** \fn bool exclude( const QFileInfo & fileInfo ) const
+		 *
+		 * \brief Test folder to be exclused
+		 *
+		 * Test folder referenced by \a fileInto to by exclused for processing.
+		 *
+		 * \return True if exclused, otherwise false.
+		 *
+		 * \sa void selectExcludeFolder(), void addExcludeFolder( QString path )
+		 */
+		//bool exclude( const QFileInfo & fileInfo ) const;
 
 	public:
 		FormMain( QWidget * parent = 0 );
 
 	public Q_SLOTS:
-		void selectCurrentPath();
+		/** \fn void selectCurrentPath()
+		 *
+		 * \brief Selects root directory
+		 *
+		 * \sa void setCurrentPath( QString newPath = QString() )
+		 */
+		//void selectCurrentPath();
 
-		void setCurrentPath( QString newPath = QString() );
+		void setCurrentPath( const QString & newPath, const QListWidget & exc );
 
-		void selectExcludeFolder();
+		/** \fn void selectExcludeFolder()
+		 *
+		 * \brief Selects folder to be excluded
+		 *
+		 * \sa void addExcludeFolder( QString path )
+		 */
+		//void selectExcludeFolder();
 
-		void addExcludeFolder( QString path );
+		//void addExcludeFolder( QString path );
 
 		void folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * previous );
 #ifdef DEBUG
@@ -71,6 +152,10 @@ class FormMain : public QMainWindow
 #endif
 
 	Q_SIGNALS:
+		/** \fn void yell( const QString & message ) const
+		 *
+		 * \brief Emits errors and other messages
+		 */
 		void yell( const QString & message ) const;
 };
 

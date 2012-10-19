@@ -4,6 +4,7 @@
 #include <QtGui>
 #include <QtSql>
 #include "Chart.h"
+#include "DialogInput.h"
 
 #ifdef DEBUG
 #include <QDebug>
@@ -17,16 +18,34 @@ FormMain::FormMain( QWidget * parent )
 	emit yell( "is debugging!!!" );
 #endif
 
+	setWindowTitle( tr("Folder chart") );
+
 	createWidgets();
 
-	createToolBar();
+	//createToolBar();
 
 	QSqlDatabase sqlite3 = QSqlDatabase::addDatabase("QSQLITE");	// Sqlite3 database
 
 	sqlite3.setDatabaseName( DB_PATH );
 
-	if ( ! sqlite3.open() )
+	if ( sqlite3.open() ) {
+		QSqlQuery q( sqlite3 );
+
+		// speed up sqlite3 queries
+
+		if ( ! q.exec( "PRAGMA synchronous=OFF" ) )
+			emit yell( q.lastError().text() );
+
+		if ( ! q.exec( "PRAGMA journal_mode=OFF" ) )
+			emit yell( q.lastError().text() );
+
+		if ( ! q.exec( "PRAGMA cache_size=2000000" ) )		// 2 MB
+			emit yell( q.lastError().text() );
+
+	} else {
 		emit yell( tr("Can't open %1").arg( DB_PATH ) );
+
+	}
 }
 
 #ifdef DEBUG
@@ -34,6 +53,9 @@ void
 FormMain::yellDebug( const QString & message )
 {
 	qDebug() << "yell:" << message;
+#ifdef Q_OS_WIN32
+	QMessageBox::critical( this, tr("Critical"), message );
+#endif
 }
 #endif
 
@@ -41,29 +63,32 @@ void
 FormMain::createWidgets()
 {
 	tree = new QTreeWidget( this );
+	tree->setHeaderLabel("");
 
 	editInfo = new QTextEdit( this );
 
 	connect( tree, SIGNAL( currentItemChanged( QTreeWidgetItem *, QTreeWidgetItem * ) ),
 			SLOT( folderChanged( QTreeWidgetItem *, QTreeWidgetItem * ) ) );
 
-	listExc = new QListWidget( this );
+	//listExc = new QListWidget( this );
 
 	chart = new Chart( this );
 
-	QSplitter * splitterHor = new QSplitter( Qt::Horizontal, this ),
-			  * splitterVer = new QSplitter( Qt::Vertical, this );
+	QSplitter * splitterHor = new QSplitter( Qt::Horizontal, this );
+			  //* splitterVer = new QSplitter( Qt::Vertical, this );
 
-	splitterVer->addWidget( listExc );
-	splitterVer->addWidget( chart );
+	//splitterVer->addWidget( listExc );
+	//splitterVer->addWidget( chart );
 
 	splitterHor->addWidget( tree );
 	splitterHor->addWidget( editInfo );
-	splitterHor->addWidget( splitterVer );
+	//splitterHor->addWidget( splitterVer );
+	splitterHor->addWidget( chart );
 
 	setCentralWidget( splitterHor );
 }
 
+/*
 void
 FormMain::createToolBar()
 {
@@ -75,12 +100,13 @@ FormMain::createToolBar()
 	toolBar->addAction( QIcon(":/red.png"), tr("add exclude folder"),
 			this, SLOT( selectExcludeFolder() ) );
 }
+*/
 
 void
-FormMain::setCurrentPath( QString newPath )
+FormMain::setCurrentPath( const QString & newPath, const QListWidget & exc )
 {
 	if ( newPath.isNull() )
-		newPath = QDir::currentPath();
+		return;
 
 	if ( currentPath == newPath )
 		return;
@@ -96,14 +122,17 @@ FormMain::setCurrentPath( QString newPath )
 
 	qApp->setOverrideCursor( Qt::WaitCursor );
 
-	QTreeWidgetItem * rootItem = processPath( currentPath, commonSize );
+	QTreeWidgetItem * rootItem = processPath( currentPath, commonSize, exc );
 
 	qApp->restoreOverrideCursor();
 
 	if ( rootItem )
 		tree->addTopLevelItem( rootItem );
+
+	statusBar()->showMessage( "Finished", 3000 );	// 3 seconds
 }
 
+/*
 void
 FormMain::addExcludeFolder( QString path )
 {
@@ -126,7 +155,9 @@ FormMain::addExcludeFolder( QString path )
 
 	setCurrentPath( cp );
 }
+*/
 
+/*
 void
 FormMain::selectCurrentPath()
 {
@@ -136,7 +167,9 @@ FormMain::selectCurrentPath()
 	if ( ! dir.isEmpty() )
 		setCurrentPath( dir );
 }
+*/
 
+/*
 void
 FormMain::selectExcludeFolder()
 {
@@ -146,10 +179,16 @@ FormMain::selectExcludeFolder()
 	if ( ! dir.isEmpty() )
 		addExcludeFolder( dir );
 }
+*/
 
 QTreeWidgetItem *
-FormMain::processPath( const QString & path, qint64 & dirSize, int parent_id )
+FormMain::processPath( const QString & path, qint64 & dirSize,
+		const QListWidget & exc, int parent_id )
 {
+	statusBar()->showMessage( path );
+
+	qApp->processEvents();
+
 	QDir dir( path );
 
 	if ( ! dir.exists() )
@@ -174,10 +213,22 @@ FormMain::processPath( const QString & path, qint64 & dirSize, int parent_id )
 
 	for ( int i = 0; i < list.size(); ++i ) {
 
+		/*
 		if ( exclude( list[ i ] ) )
 			continue;
+			*/
+		bool e = false;
 
-		item->addChild( processPath( list[ i ].absoluteFilePath(), dir_size, dbDirId ) );
+		for ( int j = 0; j < exc.count(); ++j )
+			if ( list[ i ].absoluteFilePath() == exc.item( j )->text() ) {
+				e = true;
+				break;
+			}
+
+		if ( e )
+			continue;
+
+		item->addChild( processPath( list[ i ].absoluteFilePath(), dir_size, exc, dbDirId ) );
 	}
 
 	// files
@@ -390,13 +441,68 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 
 		text += q.value( 0 ).toString() + "<BR>" +
 			"Path: " + q.value( 1 ).toString() + "<BR>" +
-			"Size: " + q.value( 2 ).toString() + "<BR>" +
-			QString( 50, '-' ) + "<BR>";		// horizontal line -------
+			"Size: " + q.value( 2 ).toString() + "<BR>";
 
 	} else {
 		emit yell( q.lastError().text() );
 		return;
 	}
+	// count of folders
+	q.prepare("SELECT count( 1 ) "
+			"FROM "
+				"folders "
+			"WHERE "
+				"parent_id = :id");
+
+	q.bindValue(":id", folder_id );
+
+	int folderCount = 0;
+
+	if ( q.exec() && q.first() )
+		folderCount = q.value( 0 ).toInt();
+	else
+		emit yell( q.lastError().text() );
+
+	// percent of folders
+	q.prepare("SELECT "
+			"100 - SUM( percent ) "
+		"FROM "
+			"percents "
+		"WHERE "
+			"folders_id = :id ");
+
+	q.bindValue(":id", folder_id );
+
+	if ( q.exec() && q.first() )
+		text += tr("folders: %1 (%2%)<BR>")
+			.arg( folderCount )
+			.arg( q.value( 0 ).toDouble(), 0, 'f', 1 );
+
+	else
+		emit yell( q.lastError().text() );
+
+	// count of files
+	q.prepare("SELECT "
+			"type, "
+			"quantity, "
+			"percent "
+		"FROM "
+			"percents "
+		"WHERE "
+			"folders_id = :id ");
+
+	q.bindValue(":id", folder_id );
+
+	if ( q.exec() )
+		while ( q.next() )
+			text += tr("%1: %2 (%3%)<BR>")
+				.arg( q.value( 0 ).toString() )
+				.arg( q.value( 1 ).toString() )
+				.arg( q.value( 2 ).toDouble(), 0, 'f', 1 );
+	else
+		emit yell( q.lastError().text() );
+
+	text += QString( 50, '-' ) + "<BR>";		// horizontal line -------
 
 	// folders
 	text += "<BR><B>folders:</B><BR>";
@@ -471,10 +577,10 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 		return;
 	}
 
-
 	editInfo->setHtml( text );
 }
 
+/*
 bool
 FormMain::exclude( const QFileInfo & fileInfo ) const
 {
@@ -486,6 +592,7 @@ FormMain::exclude( const QFileInfo & fileInfo ) const
 
 	return false;
 }
+*/
 
 
 

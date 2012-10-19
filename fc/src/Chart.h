@@ -1,4 +1,9 @@
 
+/** \class Chart
+ *
+ * \brief Widget with histogramm chart
+ */
+
 #ifndef CHART_H
 #define CHART_H
 
@@ -22,8 +27,16 @@ class Chart : public QWidget
 	public:
 		Chart( QWidget * parent );
 
+		/** \fn void addPiece( qreal value, const QString & caption )
+		 *
+		 * \brief Add an alement of histogramm
+		 */
 		void addPiece( qreal value, const QString & caption );
 
+		/** \fn void clear()
+		 *
+		 * \brief Removes all pieces
+		 */
 		void clear();
 };
 

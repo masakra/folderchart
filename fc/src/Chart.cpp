@@ -14,24 +14,18 @@ void
 Chart::paintEvent( QPaintEvent * e )
 {
 	QPainter painter;
-	QFont font;
-	painter.begin(this);
+	//QFont font;
+	painter.begin( this );
+
 	Nightcharts PieChart;
 
-	PieChart.setType( Nightcharts::Histogramm );//{Histogramm,Pie,DPie};
-	PieChart.setLegendType( Nightcharts::Vertical );//{Round,Vertical}
-	PieChart.setCords( 20, 20, this->width() - 40, this->height() - 40 );
+	PieChart.setType( Nightcharts::Histogramm );		//{Histogramm,Pie,DPie};
+	PieChart.setLegendType( Nightcharts::Vertical );	//{Round,Vertical}
+	PieChart.setCords( 20, 20, width() - 40, height() - 40 );
 
-	for ( int i = 0; i < pieces.size(); ++i ) {
+	for ( int i = 0; i < pieces.size(); ++i )
 		PieChart.addPiece( pieces[ i ].caption, pieces[ i ].color, pieces[ i ].value );
-	}
-	/*
-	PieChart.addPiece( "Item1", QColor( 200, 10, 50 ), 34 );
-	PieChart.addPiece( "Item2", Qt::green, 27 );
-	PieChart.addPiece( "Item3", Qt::cyan, 14 );
-	PieChart.addPiece( "Item4", Qt::yellow, 7 );
-	PieChart.addPiece( "Item5", Qt::blue, 4 );
-	*/
+
 	PieChart.draw( &painter );
 
 	PieChart.setLegendCords( 30, 20 );

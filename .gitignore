@@ -4,3 +4,4 @@ moc_*
 *.pro
 *.o
 Makefile
+qrc_*.cpp
