@@ -93,6 +93,10 @@ DialogInput::selectExclude()
 void
 DialogInput::deleteExclude()
 {
+	QListWidgetItem * item = exclude->currentItem();
+
+	if ( item )
+		delete item;
 }
 
 QString

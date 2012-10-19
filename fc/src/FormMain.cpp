@@ -473,7 +473,7 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 
 	q.bindValue(":id", folder_id );
 
-	if ( q.exec() && q.first() )
+	if ( q.exec() && q.first() && ( folderCount !=0 ) )
 		text += tr("folders: %1 (%2%)<BR>")
 			.arg( folderCount )
 			.arg( q.value( 0 ).toDouble(), 0, 'f', 1 );
