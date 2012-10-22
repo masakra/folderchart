@@ -15,7 +15,7 @@ FormMain::FormMain( QWidget * parent )
 {
 #ifdef DEBUG
 	connect( this, SIGNAL( yell( const QString & ) ), SLOT( yellDebug( const QString & ) ) );
-	emit yell( "is debugging!!!" );
+	emit yell( tr("is debugging!!!, drivers: %1").arg( QSqlDatabase::drivers().join(", ") ) );
 #endif
 
 	setWindowTitle( tr("Folder chart") );
@@ -43,7 +43,9 @@ FormMain::FormMain( QWidget * parent )
 			emit yell( q.lastError().text() );
 
 	} else {
-		emit yell( tr("Can't open %1").arg( DB_PATH ) );
+		emit yell( tr("Can't open %1 with error %2")
+				.arg( DB_PATH )
+				.arg( sqlite3.lastError().text() ) );
 
 	}
 }
