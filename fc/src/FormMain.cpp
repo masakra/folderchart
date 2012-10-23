@@ -68,6 +68,10 @@ FormMain::createWidgets()
 {
 	tree = new QTreeWidget( this );
 	tree->setHeaderLabel("");
+	tree->setContextMenuPolicy( Qt::CustomContextMenu );
+
+	connect( tree, SIGNAL( customContextMenuRequested( const QPoint & ) ),
+			SLOT( treeContextMenu( const QPoint & ) ) );
 
 	editInfo = new QTextEdit( this );
 
@@ -391,7 +395,7 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 		if ( q.first() )
 			text += q.value( 0 ).toString() + "<BR>" +
 				"Path: " + q.value( 1 ).toString() + "<BR>" +
-				"Size: " + q.value( 2 ).toString() + "<BR>";
+				"Size: " + prettyPrint( q.value( 2 ).toLongLong() ) + "<BR>";
 
 	} else {
 		emit yell( q.lastError().text() );
@@ -441,7 +445,9 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 		"FROM "
 			"percents "
 		"WHERE "
-			"folders_id = :id ");
+			"folders_id = :id "
+		"ORDER BY "
+			"percent DESC");
 
 	q.bindValue(":id", folder_id );
 
@@ -474,7 +480,7 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 	if ( q.exec() ) {
 		while ( q.next() )
 			text += q.value( 0 ).toString() +
-				" (" + q.value( 1 ).toString() + ")<BR>";
+				" (" + prettyPrint( q.value( 1 ).toLongLong() ) + ")<BR>";
 
 	} else {
 		emit yell( q.lastError().text() );
@@ -499,7 +505,7 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 	if ( q.exec() ) {
 		while ( q.next() )
 			text += q.value( 0 ).toString() +
-				" (" + q.value( 1 ).toString() + ")<BR>";
+				" (" + prettyPrint( q.value( 1 ).toLongLong() ) + ")<BR>";
 
 	} else {
 		emit yell( q.lastError().text() );
@@ -513,7 +519,9 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 		"FROM "
 			"percents "
 		"WHERE "
-			"folders_id = :id");
+			"folders_id = :id "
+		"ORDER BY "
+			"percent DESC");
 
 	q.bindValue(":id", folder_id );
 
@@ -535,11 +543,11 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 void
 FormMain::dbRestoreFromDb()
 {
-	dbProcessFolderId( -1 );
+	dbGetFolder( -1 );
 }
 
 void
-FormMain::dbProcessFolderId( int parent_id, QTreeWidgetItem * parent )
+FormMain::dbGetFolder( int parent_id, QTreeWidgetItem * parent )
 {
 	QSqlQuery q;
 
@@ -565,7 +573,7 @@ FormMain::dbProcessFolderId( int parent_id, QTreeWidgetItem * parent )
 			item->setText( 0, q.value( 0 ).toString() );
 			item->setData( 0, Qt::UserRole, folder_id );
 
-			dbProcessFolderId( folder_id, item );
+			dbGetFolder( folder_id, item );
 
 			if ( parent )
 				parent->addChild( item );
@@ -582,4 +590,77 @@ FormMain::clearAll()
 	dbClear();
 	tree->clear();
 }
+
+QString
+FormMain::prettyPrint( qint64 value ) const
+{
+	if ( value / 1024 / 1024 / 1024 / 1024 > 0 )
+		return QString("%1 TB").arg( value / 1024. / 1024. / 1024 / 1024., 0, 'f', 2 );
+
+	else if ( value / 1024 / 1024 / 1024 > 0 )
+		return QString("%1 GB").arg( value / 1024. / 1024. / 1024., 0, 'f', 2 );
+
+	else if ( value / 1024 / 1024 > 0 )
+		return QString("%1 MB").arg( value / 1024. / 1024., 0, 'f', 2 );
+
+	else if ( value / 1024 > 0 )
+		return QString("%1 KB").arg( value / 1024., 0, 'f', 2 );
+
+	else
+		return QString("%1 bytes").arg( value );
+
+
+	return QString();
+}
+
+void
+FormMain::treeContextMenu( const QPoint & )
+{
+	QMenu menu;
+
+	QAction * actionOpenInFileManager = menu.addAction( tr("Open in file manager"),
+			this, SLOT( openInFileManager() ) );
+
+	QTreeWidgetItem * item = tree->currentItem();
+
+	if ( ! item )
+		actionOpenInFileManager->setEnabled( false );
+
+	menu.exec( QCursor::pos() );
+}
+
+void
+FormMain::openInFileManager()
+{
+	QTreeWidgetItem * item = tree->currentItem();
+
+	if ( ! item )
+		return;
+
+	int folder_id = item->data( 0, Qt::UserRole ).toInt();
+
+	QSqlQuery q;
+
+	q.prepare("SELECT "
+			"path "
+		"FROM "
+			"folders "
+		"WHERE "
+			"id = :id");
+
+	q.bindValue(":id", folder_id );
+
+	if ( q.exec() ) {
+		if ( q.first() ) {
+			const QString path = q.value( 0 ).toString();
+
+			QProcess * process = new QProcess;
+			process->startDetached( "explorer.exe " + QDir::toNativeSeparators( path ) );
+		}
+	} else {
+		emit yell( q.lastError().text() );
+	}
+}
+
+
 

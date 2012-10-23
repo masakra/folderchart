@@ -30,11 +30,6 @@ class FormMain : public QMainWindow
 		/** \fn void createToolBar()
 		 *
 		 * \brief Creates tool bar
-		 *
-		 * For demonstration only. Without this call slots selectCurrentPath()
-		 * and selectExcludeFolder().
-		 *
-		 * \sa void selectCurrentPath(), void selectExcludeFolder()
 		 */
 		void createToolBar();
 
@@ -55,7 +50,7 @@ class FormMain : public QMainWindow
 		 * parent folder size variable. \a parent_id is a ID in sqlite3 table 'folders'.
 		 * Calls recursively!
 		 *
-		 * \return Tree item
+		 * \return Item of tree
 		 */
 		QTreeWidgetItem * processPath( const QString & path, qint64 & dirSize,
 				const QListWidget & exc, int parent_id = -1 );
@@ -108,21 +103,42 @@ class FormMain : public QMainWindow
 		 */
 		void dbSaveFolderSize( int folder_id, qint64 size ) const;
 
+		/** \fn void dbRestoreFromDb()
+		 *
+		 * \brief Restores tree state from sqlite database
+		 */
 		void dbRestoreFromDb();
 
-		void dbProcessFolderId( int parent_id, QTreeWidgetItem * parent = 0 );
+		/** \fn void dbGetFolder( int parent_id, QTreeWidgetItem * parent = 0 )
+		 *
+		 * \brief Restores content of folder by \a parent_id
+		 */
+		void dbGetFolder( int parent_id, QTreeWidgetItem * parent = 0 );
+
+		QString prettyPrint( qint64 value ) const;
 
 	public:
 		FormMain( QWidget * parent = 0 );
 
 	public Q_SLOTS:
+		/** \fn void selectFolders()
+		 *
+		 * \brief Invokes folder and exclusion selection dialog
+		 */
 		void selectFolders();
 
+		/** \fn void setFolders( const QListWidget & cur, const QListWidget & exc )
+		 */
 		void setFolders( const QListWidget & cur, const QListWidget & exc );
 
 		void clearAll();
 
 		void folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * previous );
+
+		void treeContextMenu( const QPoint & pos );
+
+		void openInFileManager();
+
 #ifdef DEBUG
 		void yellDebug( const QString & message );
 #endif
