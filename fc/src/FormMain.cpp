@@ -543,7 +543,7 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 void
 FormMain::dbRestoreFromDb()
 {
-	dbGetFolder( -1 );
+	dbGetFolder( NO_PARENT );
 }
 
 void
@@ -608,9 +608,6 @@ FormMain::prettyPrint( qint64 value ) const
 
 	else
 		return QString("%1 bytes").arg( value );
-
-
-	return QString();
 }
 
 void
@@ -652,10 +649,14 @@ FormMain::openInFileManager()
 
 	if ( q.exec() ) {
 		if ( q.first() ) {
-			const QString path = q.value( 0 ).toString();
+			const QStringList params = QStringList()
+				<<  QDir::toNativeSeparators( q.value( 0 ).toString() );
 
-			QProcess * process = new QProcess;
-			process->startDetached( "explorer.exe " + QDir::toNativeSeparators( path ) );
+#ifdef Q_OS_WIN32
+			QProcess::startDetached( "explorer.exe", params );
+#else
+			QProcess::startDetached( "xdg-open", params );
+#endif
 		}
 	} else {
 		emit yell( q.lastError().text() );

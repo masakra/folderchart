@@ -12,6 +12,10 @@
 class Chart : public QWidget
 {
 	private:
+		/** \struct Piece
+		 *
+		 * \brief Element of histogramm
+		 */
 		struct Piece {
 			qreal value;
 			QString caption;

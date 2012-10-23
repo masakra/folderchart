@@ -4,13 +4,20 @@
 
 #define DB_PATH "data.db"
 
-/** \class MainWindow
+/** \class FormMain
  *
- * \brief Main widget
+ * \brief Main window
  */
 
-#include <QMainWindow>
+/** \def NO_PARENT
+ *
+ * \brief Value for `parent_id' column in table `folders'
+ *
+ * This value defines folders without a parent.
+ */
+#define NO_PARENT -1
 
+#include <QMainWindow>
 
 class QDir;
 class QFileInfo;
@@ -37,8 +44,6 @@ class FormMain : public QMainWindow
 
 		QTextEdit * editInfo;
 
-		//QListWidget * listExc;
-
 		Chart * chart;
 
 		/** \fn QTreeWidgetItem * processPath( const QString & path, qint64 & dirSize,
@@ -53,7 +58,7 @@ class FormMain : public QMainWindow
 		 * \return Item of tree
 		 */
 		QTreeWidgetItem * processPath( const QString & path, qint64 & dirSize,
-				const QListWidget & exc, int parent_id = -1 );
+				const QListWidget & exc, int parent_id = NO_PARENT );
 
 		/** \fn void dbClear() const
 		 *
@@ -128,15 +133,28 @@ class FormMain : public QMainWindow
 		void selectFolders();
 
 		/** \fn void setFolders( const QListWidget & cur, const QListWidget & exc )
+		 *
+		 * \brief Appends root items into tree
 		 */
 		void setFolders( const QListWidget & cur, const QListWidget & exc );
 
+		/** \fn void clearAll()
+		 *
+		 * \brief Clears database and removes all entries from tree
+		 */
 		void clearAll();
 
 		void folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * previous );
 
 		void treeContextMenu( const QPoint & pos );
 
+		/** \fn void openInFileManager()
+		 *
+		 * \brief Open file manager with folder selected in tree
+		 *
+		 * For Windows file manager is explorer.exe otherwise it is xdg-open.
+		 *
+		 */
 		void openInFileManager();
 
 #ifdef DEBUG
