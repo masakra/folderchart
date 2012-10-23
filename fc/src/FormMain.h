@@ -36,7 +36,7 @@ class FormMain : public QMainWindow
 		 *
 		 * \sa void selectCurrentPath(), void selectExcludeFolder()
 		 */
-		//void createToolBar();
+		void createToolBar();
 
 		QTreeWidget * tree;
 
@@ -45,8 +45,6 @@ class FormMain : public QMainWindow
 		//QListWidget * listExc;
 
 		Chart * chart;
-
-		QString currentPath;
 
 		/** \fn QTreeWidgetItem * processPath( const QString & path, qint64 & dirSize,
 		 * const QListWidget & exc, int parent_id = -1 )
@@ -110,41 +108,19 @@ class FormMain : public QMainWindow
 		 */
 		void dbSaveFolderSize( int folder_id, qint64 size ) const;
 
-		/** \fn bool exclude( const QFileInfo & fileInfo ) const
-		 *
-		 * \brief Test folder to be exclused
-		 *
-		 * Test folder referenced by \a fileInto to by exclused for processing.
-		 *
-		 * \return True if exclused, otherwise false.
-		 *
-		 * \sa void selectExcludeFolder(), void addExcludeFolder( QString path )
-		 */
-		//bool exclude( const QFileInfo & fileInfo ) const;
+		void dbRestoreFromDb();
+
+		void dbProcessFolderId( int parent_id, QTreeWidgetItem * parent = 0 );
 
 	public:
 		FormMain( QWidget * parent = 0 );
 
 	public Q_SLOTS:
-		/** \fn void selectCurrentPath()
-		 *
-		 * \brief Selects root directory
-		 *
-		 * \sa void setCurrentPath( QString newPath = QString() )
-		 */
-		//void selectCurrentPath();
+		void selectFolders();
 
-		void setCurrentPath( const QString & newPath, const QListWidget & exc );
+		void setFolders( const QListWidget & cur, const QListWidget & exc );
 
-		/** \fn void selectExcludeFolder()
-		 *
-		 * \brief Selects folder to be excluded
-		 *
-		 * \sa void addExcludeFolder( QString path )
-		 */
-		//void selectExcludeFolder();
-
-		//void addExcludeFolder( QString path );
+		void clearAll();
 
 		void folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * previous );
 #ifdef DEBUG

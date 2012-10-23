@@ -11,10 +11,9 @@ Chart::Chart( QWidget * parent )
 }
 
 void
-Chart::paintEvent( QPaintEvent * e )
+Chart::paintEvent( QPaintEvent * )
 {
 	QPainter painter;
-	//QFont font;
 	painter.begin( this );
 
 	Nightcharts PieChart;

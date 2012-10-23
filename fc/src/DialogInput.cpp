@@ -14,22 +14,31 @@ DialogInput::DialogInput( QWidget * parent )
 void
 DialogInput::createWidgets()
 {
-	current = new QLineEdit( this );
+	current = new QListWidget( this );
+	current->resize( 200, 50 );
 
-	QPushButton * buttonSelectCurrent = new QPushButton( tr("..."), this ),
+	QPushButton * buttonCurAdd = new QPushButton( tr("&Add"), this ),
+				* buttonCurDel = new QPushButton( tr("&Del"), this ),
 				* buttonExcAdd = new QPushButton( tr("&Add"), this ),
 				* buttonExcDel = new QPushButton( tr("&Del"), this );
 
-	connect( buttonSelectCurrent, SIGNAL( clicked() ), SLOT( selectCurrent() ) );
+	connect( buttonCurAdd, SIGNAL( clicked() ), SLOT( selectCurrent() ) );
+	connect( buttonCurDel, SIGNAL( clicked() ), SLOT( deleteCurrent() ) );
 
 	connect( buttonExcAdd, SIGNAL( clicked() ), SLOT( selectExclude() ) );
 	connect( buttonExcDel, SIGNAL( clicked() ), SLOT( deleteExclude() ) );
 
 
-	QHBoxLayout * layoutExc = new QHBoxLayout();
-	layoutExc->addStretch();
+	QVBoxLayout * layoutCur = new QVBoxLayout(),
+				* layoutExc = new QVBoxLayout();
+
+	layoutCur->addWidget( buttonCurAdd );
+	layoutCur->addWidget( buttonCurDel );
+	layoutCur->addStretch();
+
 	layoutExc->addWidget( buttonExcAdd );
 	layoutExc->addWidget( buttonExcDel );
+	layoutExc->addStretch();
 
 	exclude = new QListWidget( this );
 
@@ -51,16 +60,14 @@ DialogInput::createWidgets()
 	layout->addWidget( labelCurrent, 0, 0 );
 	// 1 line
 	layout->addWidget( current, 1, 0 );
-	layout->addWidget( buttonSelectCurrent, 1, 1 );
+	layout->addLayout( layoutCur, 1, 1 );
 	// 2 line
 	layout->addWidget( labelExclude, 2, 0 );
 	// 3 line
 	layout->addWidget( exclude, 3, 0 );
+	layout->addLayout( layoutExc, 3, 1 );
 	// 4 line
-	layout->addLayout( layoutExc, 4, 0 );
-	// 5 line
-	layout->addWidget( buttonBox, 5, 0, 1, 2 );
-
+	layout->addWidget( buttonBox, 4, 0, 1, 2 );
 
 	setLayout( layout );
 }
@@ -68,41 +75,31 @@ DialogInput::createWidgets()
 void
 DialogInput::selectCurrent()
 {
-	QString dir = QFileDialog::getExistingDirectory( this,
-			tr("Select current directory"), QDir::currentPath() );
+	selectToList( current, "blue" );
+}
 
-	if ( ! dir.isEmpty() )
-		current->setText( dir );
+void
+DialogInput::deleteCurrent()
+{
+	deleteFromList( current );
 }
 
 void
 DialogInput::selectExclude()
 {
-	QString dir = QFileDialog::getExistingDirectory( this,
-			tr("Select exclude directory"),
-			current->text().isEmpty() ? QDir::currentPath() : current->text() );
-
-	if ( ! dir.isEmpty() )
-		exclude->addItem( dir );
-/*
-	QStringList dirs = QFileDialog::getOpenFileNames( this, tr("Select exclude directory"),
-			QDir::currentPath(), QString(), 0, QFileDialog::ShowDirsOnly );
-*/
+	selectToList( exclude, "red" );
 }
 
 void
 DialogInput::deleteExclude()
 {
-	QListWidgetItem * item = exclude->currentItem();
-
-	if ( item )
-		delete item;
+	deleteFromList( exclude );
 }
 
-QString
-DialogInput::path() const
+const QListWidget &
+DialogInput::cur() const
 {
-	return current->text();
+	return *current;
 }
 
 const QListWidget &
@@ -110,3 +107,29 @@ DialogInput::exc() const
 {
 	return *exclude;
 }
+
+void
+DialogInput::selectToList( QListWidget * list, const QString & icon )
+{
+	const QString dir = QFileDialog::getExistingDirectory( this,
+			tr("Select exclude directory"),
+			QDir::currentPath() );
+
+	if ( ! dir.isEmpty() ) {
+		QListWidgetItem * item = new QListWidgetItem();
+		item->setText( dir );
+		item->setIcon( QIcon(":/" + icon + ".png" ) );
+
+		list->addItem( item );
+	}
+}
+
+void
+DialogInput::deleteFromList( QListWidget * list ) const
+{
+	QListWidgetItem * item = list->currentItem();
+
+	if ( item )
+		delete item;
+}
+

@@ -22,7 +22,7 @@ FormMain::FormMain( QWidget * parent )
 
 	createWidgets();
 
-	//createToolBar();
+	createToolBar();
 
 	QSqlDatabase sqlite3 = QSqlDatabase::addDatabase("QSQLITE");	// Sqlite3 database
 
@@ -41,6 +41,8 @@ FormMain::FormMain( QWidget * parent )
 
 		if ( ! q.exec( "PRAGMA cache_size=2000000" ) )		// 2 MB
 			emit yell( q.lastError().text() );
+
+		dbRestoreFromDb();
 
 	} else {
 		emit yell( tr("Can't open %1 with error %2")
@@ -72,116 +74,56 @@ FormMain::createWidgets()
 	connect( tree, SIGNAL( currentItemChanged( QTreeWidgetItem *, QTreeWidgetItem * ) ),
 			SLOT( folderChanged( QTreeWidgetItem *, QTreeWidgetItem * ) ) );
 
-	//listExc = new QListWidget( this );
-
 	chart = new Chart( this );
 
 	QSplitter * splitterHor = new QSplitter( Qt::Horizontal, this );
-			  //* splitterVer = new QSplitter( Qt::Vertical, this );
-
-	//splitterVer->addWidget( listExc );
-	//splitterVer->addWidget( chart );
 
 	splitterHor->addWidget( tree );
 	splitterHor->addWidget( editInfo );
-	//splitterHor->addWidget( splitterVer );
 	splitterHor->addWidget( chart );
 
 	setCentralWidget( splitterHor );
 }
 
-/*
 void
 FormMain::createToolBar()
 {
 	QToolBar * toolBar = addToolBar("");
 
-	toolBar->addAction( QIcon(":/blue.png"), tr("set current path"),
-			this, SLOT( selectCurrentPath() ) );
+	toolBar->addAction( QIcon(":/blue.png"), tr("add folders"),
+			this, SLOT( selectFolders() ) );
 
-	toolBar->addAction( QIcon(":/red.png"), tr("add exclude folder"),
-			this, SLOT( selectExcludeFolder() ) );
+	toolBar->addAction( QIcon(":/red.png"), tr("clear all"),
+			this, SLOT( clearAll() ) );
 }
-*/
 
 void
-FormMain::setCurrentPath( const QString & newPath, const QListWidget & exc )
+FormMain::setFolders( const QListWidget & cur, const QListWidget & exc )
 {
-	if ( newPath.isNull() )
-		return;
-
-	if ( currentPath == newPath )
-		return;
-
-	currentPath = newPath;
-
-	tree->clear();
-
-	dbClear();
-
-	qint64 commonSize = 0;
-
-
 	qApp->setOverrideCursor( Qt::WaitCursor );
 
-	QTreeWidgetItem * rootItem = processPath( currentPath, commonSize, exc );
+	for ( int i = 0; i < cur.count(); ++i ) {
+		qint64 commonSize = 0;
+
+		QTreeWidgetItem * rootItem = processPath( cur.item( i )->text(), commonSize, exc );
+
+		if ( rootItem )
+			tree->addTopLevelItem( rootItem );
+	}
 
 	qApp->restoreOverrideCursor();
-
-	if ( rootItem )
-		tree->addTopLevelItem( rootItem );
 
 	statusBar()->showMessage( "Finished", 3000 );	// 3 seconds
 }
 
-/*
 void
-FormMain::addExcludeFolder( QString path )
+FormMain::selectFolders()
 {
-	QDir dir( path );
+	DialogInput d;
 
-	if ( ! dir.exists() )
-		return;
-
-	QListWidgetItem * item = new QListWidgetItem( dir.dirName() );
-	item->setIcon( QIcon(":/red.png") );
-	item->setData( Qt::ToolTipRole, dir.canonicalPath() );
-
-	listExc->addItem( item );
-
-	// renew tree
-
-	QString cp = currentPath;
-
-	currentPath.clear();
-
-	setCurrentPath( cp );
+	if ( d.exec() )
+		setFolders( d.cur(), d.exc() );
 }
-*/
-
-/*
-void
-FormMain::selectCurrentPath()
-{
-	QString dir = QFileDialog::getExistingDirectory( this, tr("Select current directory"),
-			currentPath );
-
-	if ( ! dir.isEmpty() )
-		setCurrentPath( dir );
-}
-*/
-
-/*
-void
-FormMain::selectExcludeFolder()
-{
-	QString dir = QFileDialog::getExistingDirectory( this, tr("Select exclude directory"),
-			currentPath );
-
-	if ( ! dir.isEmpty() )
-		addExcludeFolder( dir );
-}
-*/
 
 QTreeWidgetItem *
 FormMain::processPath( const QString & path, qint64 & dirSize,
@@ -311,9 +253,11 @@ FormMain::dbSaveFolder( const QDir & dir, int parent_id ) const
 	if ( q.exec() ) {
 		q.prepare("SELECT last_insert_rowid()");
 
-		if ( q.exec() &&
-				q.first() ) {
-			return q.value( 0 ).toInt();
+		if ( q.exec() ) {
+			if ( q.first() )
+				return q.value( 0 ).toInt();
+			else
+				return -1;
 
 		} else {
 			emit yell( q.lastError().text() );
@@ -324,6 +268,8 @@ FormMain::dbSaveFolder( const QDir & dir, int parent_id ) const
 		emit yell( q.lastError().text() );
 		return -1;
 	}
+
+
 }
 
 int
@@ -347,9 +293,11 @@ FormMain::dbSaveFile( const QFileInfo & fileInfo, int folder_id ) const
 	if ( q.exec() ) {
 		q.prepare("SELECT last_insert_rowid()");
 
-		if ( q.exec() &&
-				q.first() ) {
-			return q.value( 0 ).toInt();
+		if ( q.exec() ) {
+			if ( q.first() )
+				return q.value( 0 ).toInt();
+			else
+				return -1;
 
 		} else {
 			emit yell( q.lastError().text() );
@@ -439,11 +387,11 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 
 	q.bindValue(":id", folder_id );
 
-	if ( q.exec() && q.first() ) {
-
-		text += q.value( 0 ).toString() + "<BR>" +
-			"Path: " + q.value( 1 ).toString() + "<BR>" +
-			"Size: " + q.value( 2 ).toString() + "<BR>";
+	if ( q.exec() ) {
+		if ( q.first() )
+			text += q.value( 0 ).toString() + "<BR>" +
+				"Path: " + q.value( 1 ).toString() + "<BR>" +
+				"Size: " + q.value( 2 ).toString() + "<BR>";
 
 	} else {
 		emit yell( q.lastError().text() );
@@ -460,9 +408,10 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 
 	int folderCount = 0;
 
-	if ( q.exec() && q.first() )
-		folderCount = q.value( 0 ).toInt();
-	else
+	if ( q.exec() ) {
+		if ( q.first() )
+			folderCount = q.value( 0 ).toInt();
+	} else
 		emit yell( q.lastError().text() );
 
 	// percent of folders
@@ -475,12 +424,13 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 
 	q.bindValue(":id", folder_id );
 
-	if ( q.exec() && q.first() && ( folderCount !=0 ) )
-		text += tr("folders: %1 (%2%)<BR>")
-			.arg( folderCount )
-			.arg( q.value( 0 ).toDouble(), 0, 'f', 1 );
+	if ( q.exec() ) {
+		if ( q.first() && ( folderCount !=0 ) )
+			text += tr("folders: %1 (%2%)<BR>")
+				.arg( folderCount )
+				.arg( q.value( 0 ).toDouble(), 0, 'f', 1 );
 
-	else
+	} else
 		emit yell( q.lastError().text() );
 
 	// count of files
@@ -582,19 +532,54 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 	editInfo->setHtml( text );
 }
 
-/*
-bool
-FormMain::exclude( const QFileInfo & fileInfo ) const
+void
+FormMain::dbRestoreFromDb()
 {
-	const QString dirName = fileInfo.absoluteFilePath();
-
-	for ( int i = 0; i < listExc->count(); ++i )
-		if ( listExc->item( i )->data( Qt::ToolTipRole ).toString() == dirName )
-			return true;
-
-	return false;
+	dbProcessFolderId( -1 );
 }
-*/
 
+void
+FormMain::dbProcessFolderId( int parent_id, QTreeWidgetItem * parent )
+{
+	QSqlQuery q;
 
+	q.prepare("SELECT "
+			"name, "
+			"id "
+		"FROM "
+			"folders "
+		"WHERE "
+			"parent_id = :pid "
+		"ORDER BY "
+			"id");
+
+	q.bindValue( ":id", parent_id );
+
+	if ( q.exec() ) {
+		while ( q.next() ) {
+
+			const int folder_id = q.value( 1 ).toInt();
+
+			QTreeWidgetItem * item = new QTreeWidgetItem();
+			item->setIcon( 0, QIcon(":/blue.png") );
+			item->setText( 0, q.value( 0 ).toString() );
+			item->setData( 0, Qt::UserRole, folder_id );
+
+			dbProcessFolderId( folder_id, item );
+
+			if ( parent )
+				parent->addChild( item );
+			else
+				tree->addTopLevelItem( item );
+		}
+	} else
+		emit yell( q.lastError().text() );
+}
+
+void
+FormMain::clearAll()
+{
+	dbClear();
+	tree->clear();
+}
 
