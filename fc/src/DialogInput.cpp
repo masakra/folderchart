@@ -3,6 +3,8 @@
 
 #include <QtGui>
 
+QString _lastSelectedPath;
+
 DialogInput::DialogInput( QWidget * parent )
 	: QDialog( parent )
 {
@@ -113,9 +115,13 @@ DialogInput::selectToList( QListWidget * list, const QString & caption, const QS
 {
 	const QString dir = QFileDialog::getExistingDirectory( this,
 			caption,
-			QDir::currentPath() );
+			_lastSelectedPath.isEmpty() ? QDir::currentPath() : _lastSelectedPath );
 
 	if ( ! dir.isEmpty() ) {
+
+		_lastSelectedPath = dir;
+
+
 		QListWidgetItem * item = new QListWidgetItem();
 		item->setText( dir );
 		item->setIcon( QIcon(":/" + icon + ".png" ) );
