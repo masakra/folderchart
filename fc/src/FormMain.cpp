@@ -102,6 +102,15 @@ FormMain::createToolBar()
 }
 
 void
+FormMain::selectFolders()
+{
+	DialogInput d;
+
+	if ( d.exec() )
+		setFolders( d.cur(), d.exc() );
+}
+
+void
 FormMain::setFolders( const QListWidget & cur, const QListWidget & exc )
 {
 	qApp->setOverrideCursor( Qt::WaitCursor );
@@ -118,15 +127,6 @@ FormMain::setFolders( const QListWidget & cur, const QListWidget & exc )
 	qApp->restoreOverrideCursor();
 
 	statusBar()->showMessage( "Finished", 3000 );	// 3 seconds
-}
-
-void
-FormMain::selectFolders()
-{
-	DialogInput d;
-
-	if ( d.exec() )
-		setFolders( d.cur(), d.exc() );
 }
 
 QTreeWidgetItem *
@@ -149,13 +149,19 @@ FormMain::processPath( const QString & path, qint64 & dirSize,
 
 	QTreeWidgetItem * item = new QTreeWidgetItem();
 	item->setIcon( 0, QIcon(":/blue.png" ) );
-	item->setText( 0, dir.dirName() );
+
+	if ( dir.isRoot() )
+		item->setText( 0, dir.rootPath() );
+	else
+		item->setText( 0, dir.dirName() );
+
 	item->setData( 0, Qt::UserRole, dbDirId );
 
 	qint64 dir_size = 0;
 
 	// folders
-	QFileInfoList list = dir.entryInfoList( QDir::AllDirs | QDir::NoDotAndDotDot , QDir::Name );
+	QFileInfoList list = dir.entryInfoList( QDir::AllDirs | QDir::NoDotAndDotDot | QDir::Drives,
+			QDir::Name );
 
 	const int dirCount = list.size();
 
@@ -196,7 +202,7 @@ FormMain::processPath( const QString & path, qint64 & dirSize,
 	QHash< QString, int > counts;
 
 	for ( int i = 0; i < list.size(); ++i ) {
-		const QString suffix = list[ i ].suffix();
+		const QString suffix = list[ i ].suffix().toLower();
 
 		if ( counts.contains( suffix ) )
 			counts[ suffix ] += 1;
@@ -250,7 +256,7 @@ FormMain::dbSaveFolder( const QDir & dir, int parent_id ) const
 			":siz )");
 
 	q.bindValue(":pid", parent_id );
-	q.bindValue(":nam", dir.dirName() );
+	q.bindValue(":nam", dir.dirName().isEmpty() ? dir.rootPath() : dir.dirName() );
 	q.bindValue(":pat", dir.absolutePath() );
 	q.bindValue(":siz", 0 );		// void dbSaveFolderSize( int folder_id, qint64 size ) const
 

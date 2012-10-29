@@ -30,7 +30,7 @@ class DialogInput : public QDialog
 		 * Icon defines by name \a icon from resource file without extention.
 		 * Currently "blue" or "red".
 		 */
-		void selectToList( QListWidget * list, const QString & icon );
+		void selectToList( QListWidget * list, const QString & caption, const QString & icon );
 
 		/** \fn void deleteFromList( QListWidget * list ) const
 		 *

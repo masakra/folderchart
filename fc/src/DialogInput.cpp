@@ -75,7 +75,7 @@ DialogInput::createWidgets()
 void
 DialogInput::selectCurrent()
 {
-	selectToList( current, "blue" );
+	selectToList( current, tr("Select directories"), "blue" );
 }
 
 void
@@ -87,7 +87,7 @@ DialogInput::deleteCurrent()
 void
 DialogInput::selectExclude()
 {
-	selectToList( exclude, "red" );
+	selectToList( exclude, tr("Select exclude directories"), "red" );
 }
 
 void
@@ -109,10 +109,10 @@ DialogInput::exc() const
 }
 
 void
-DialogInput::selectToList( QListWidget * list, const QString & icon )
+DialogInput::selectToList( QListWidget * list, const QString & caption, const QString & icon )
 {
 	const QString dir = QFileDialog::getExistingDirectory( this,
-			tr("Select exclude directory"),
+			caption,
 			QDir::currentPath() );
 
 	if ( ! dir.isEmpty() ) {

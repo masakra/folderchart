@@ -20,14 +20,14 @@ Chart::paintEvent( QPaintEvent * )
 
 	PieChart.setType( Nightcharts::Histogramm );		//{Histogramm,Pie,DPie};
 	PieChart.setLegendType( Nightcharts::Vertical );	//{Round,Vertical}
-	PieChart.setCords( 20, 20, width() - 40, height() - 40 );
+	PieChart.setCords( 10, 15, width() - 120, height() - 25 );
 
 	for ( int i = 0; i < pieces.size(); ++i )
 		PieChart.addPiece( pieces[ i ].caption, pieces[ i ].color, pieces[ i ].value );
 
 	PieChart.draw( &painter );
 
-	PieChart.setLegendCords( 30, 20 );
+	PieChart.setLegendCords( width() - 100, 10 );
 
 	PieChart.drawLegend( &painter );
 }
