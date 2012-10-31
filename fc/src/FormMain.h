@@ -40,6 +40,10 @@ class FormMain : public QMainWindow
 		 */
 		void createToolBar();
 
+		void createActions();
+
+		QAction * actionInfoDeep;
+
 		QTreeWidget * tree;
 
 		QTextEdit * editInfo;
@@ -122,6 +126,13 @@ class FormMain : public QMainWindow
 
 		QString prettyPrint( qint64 value ) const;
 
+		void countFolders( int folder_id, int & count ) const;
+
+		void countTypes( int folder_id, QHash< QString, int > & types, int & count ) const;
+
+	private Q_SLOTS:
+		void infoDeep( bool checked );
+
 	public:
 		FormMain( QWidget * parent = 0 );
 
@@ -144,7 +155,7 @@ class FormMain : public QMainWindow
 		 */
 		void clearAll();
 
-		void folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * previous );
+		void folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * previous = 0 );
 
 		void treeContextMenu( const QPoint & pos );
 

@@ -1,6 +1,7 @@
 <!DOCTYPE RCC><RCC version="1.0">
  <qresource>
 	<file alias="blue.png">icons/folder_blue.png</file>
+	<file alias="blue_deep.png">icons/folder_blue_deep.png</file>
 	<file alias="red.png">icons/folder_red.png</file>
  </qresource>
 </RCC>

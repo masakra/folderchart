@@ -22,6 +22,8 @@ FormMain::FormMain( QWidget * parent )
 
 	createWidgets();
 
+	createActions();
+
 	createToolBar();
 
 	QSqlDatabase sqlite3 = QSqlDatabase::addDatabase("QSQLITE");	// Sqlite3 database
@@ -99,6 +101,43 @@ FormMain::createToolBar()
 
 	toolBar->addAction( QIcon(":/red.png"), tr("clear all"),
 			this, SLOT( clearAll() ) );
+
+	toolBar->addSeparator();
+
+	toolBar->addAction( actionInfoDeep );
+}
+
+void
+FormMain::createActions()
+{
+	actionInfoDeep = new QAction( this );
+	actionInfoDeep->setCheckable( true );
+	actionInfoDeep->setIcon( QIcon(":/blue.png") );
+	actionInfoDeep->setToolTip( tr("Staticstics without included folders") );
+
+	connect( actionInfoDeep, SIGNAL( toggled( bool ) ), SLOT( infoDeep( bool ) ) );
+}
+
+void
+FormMain::infoDeep( bool checked )
+{
+	static const QString stat_with_sub( tr("Staticstics with subfolders") ),
+						 stat_without_sub( tr("Staticstics without subfolders") );
+
+	if ( checked ) {
+		actionInfoDeep->setIcon( QIcon(":/blue_deep.png") );
+		actionInfoDeep->setToolTip( stat_with_sub );
+		statusBar()->showMessage( stat_with_sub, 3000 );
+	} else {
+		actionInfoDeep->setIcon( QIcon(":/blue.png") );
+		actionInfoDeep->setToolTip( stat_without_sub );
+		statusBar()->showMessage( stat_without_sub, 3000 );
+	}
+
+	QTreeWidgetItem * current = tree->currentItem();
+
+	if ( current )
+		folderChanged( current );
 }
 
 void
@@ -407,64 +446,51 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 		emit yell( q.lastError().text() );
 		return;
 	}
+
 	// count of folders
-	q.prepare("SELECT count( 1 ) "
-			"FROM "
-				"folders "
-			"WHERE "
-				"parent_id = :id");
-
-	q.bindValue(":id", folder_id );
-
 	int folderCount = 0;
+	countFolders( folder_id, folderCount );
 
-	if ( q.exec() ) {
-		if ( q.first() )
-			folderCount = q.value( 0 ).toInt();
-	} else
-		emit yell( q.lastError().text() );
+	// count of types
+	int typeCount = 0;
+	QHash< QString, int > types;
+	countTypes( folder_id, types, typeCount );
+
+	// ordering
+	QMultiMap< int, QString > typesMap;
+	QHash< QString, int >::const_iterator h = types.constBegin();
+
+	while ( h != types.constEnd() ) {
+		typesMap.insert( h.value(), h.key() );
+		++h;
+	}
 
 	// percent of folders
-	q.prepare("SELECT "
-			"100 - SUM( percent ) "
-		"FROM "
-			"percents "
-		"WHERE "
-			"folders_id = :id ");
+	text += tr("folders: %1 (%2%)<BR>")
+		.arg( folderCount )
+		.arg( folderCount / ( qreal )( folderCount + typeCount ) * 100., 0, 'f', 1 );
 
-	q.bindValue(":id", folder_id );
+	// percents of files
 
-	if ( q.exec() ) {
-		if ( q.first() && ( folderCount !=0 ) )
-			text += tr("folders: %1 (%2%)<BR>")
-				.arg( folderCount )
-				.arg( q.value( 0 ).toDouble(), 0, 'f', 1 );
+	chart->clear();
 
-	} else
-		emit yell( q.lastError().text() );
+	if ( typesMap.count() > 0 ) {
+		QMultiMap< int, QString >::const_iterator mm = typesMap.constEnd();
 
-	// count of files
-	q.prepare("SELECT "
-			"type, "
-			"quantity, "
-			"percent "
-		"FROM "
-			"percents "
-		"WHERE "
-			"folders_id = :id "
-		"ORDER BY "
-			"percent DESC");
+		do {
+			--mm;
 
-	q.bindValue(":id", folder_id );
+			const qreal percent = mm.key() / ( qreal )( folderCount + typeCount ) * 100;
 
-	if ( q.exec() )
-		while ( q.next() )
 			text += tr("%1: %2 (%3%)<BR>")
-				.arg( q.value( 0 ).toString() )
-				.arg( q.value( 1 ).toString() )
-				.arg( q.value( 2 ).toDouble(), 0, 'f', 1 );
-	else
-		emit yell( q.lastError().text() );
+				.arg( mm.value() )
+				.arg( mm.key() )
+				.arg( percent, 0, 'f', 1 );
+
+			chart->addPiece( percent, mm.value() );
+
+		} while ( mm != typesMap.constBegin() );
+	}
 
 	text += QString( 50, '-' ) + "<BR>";		// horizontal line -------
 
@@ -512,31 +538,6 @@ FormMain::folderChanged( QTreeWidgetItem * current, QTreeWidgetItem * )
 		while ( q.next() )
 			text += q.value( 0 ).toString() +
 				" (" + prettyPrint( q.value( 1 ).toLongLong() ) + ")<BR>";
-
-	} else {
-		emit yell( q.lastError().text() );
-		return;
-	}
-
-	// chart
-	q.prepare("SELECT "
-			"type, "
-			"percent "
-		"FROM "
-			"percents "
-		"WHERE "
-			"folders_id = :id "
-		"ORDER BY "
-			"percent DESC");
-
-	q.bindValue(":id", folder_id );
-
-	if ( q.exec() ) {
-
-		chart->clear();
-
-		while ( q.next() )
-			chart->addPiece( q.value( 1 ).toReal(), q.value( 0 ).toString() );
 
 	} else {
 		emit yell( q.lastError().text() );
@@ -669,5 +670,79 @@ FormMain::openInFileManager()
 	}
 }
 
+void
+FormMain::countFolders( int folder_id, int & count ) const
+{
+	QSqlQuery q;
 
+	q.prepare("SELECT "
+				"id "
+			"FROM "
+				"folders "
+			"WHERE "
+				"parent_id = :id");
+
+	q.bindValue(":id", folder_id );
+
+	if ( q.exec() ) {
+		while ( q.next() ) {
+			++count;
+			if ( actionInfoDeep->isChecked() )
+				countFolders( q.value( 0 ).toInt(), count );	// recursion
+		}
+	} else
+		emit yell( q.lastError().text() );
+}
+
+void
+FormMain::countTypes( int folder_id, QHash< QString, int > & types, int & count ) const
+{
+	QSqlQuery q;
+
+	q.prepare("SELECT "
+			"type, "
+			"quantity "
+		"FROM "
+			"percents "
+		"WHERE "
+			"folders_id = :id");
+
+	q.bindValue(":id", folder_id );
+
+	if ( q.exec() ) {
+		while ( q.next() ) {
+			const QString type = q.value( 0 ).toString();
+			const int quantity = q.value( 1 ).toInt();
+
+			if ( types.contains( type ) )
+				types[ type ] += quantity;
+			else
+				types[ type ] = quantity;
+
+			count += quantity;
+		}
+	} else {
+		emit yell( q.lastError().text() );
+		return;
+	}
+
+	if ( ! actionInfoDeep->isChecked() )
+		return;
+
+	q.prepare("SELECT "
+			"id "
+		"FROM "
+			"folders "
+		"WHERE "
+			"parent_id = :id");
+
+	q.bindValue(":id", folder_id );
+
+	if ( q.exec() ) {
+		while ( q.next() )
+			countTypes( q.value( 0 ).toInt(), types, count ); // recursion
+
+	} else
+		emit yell( q.lastError().text() );
+}
 
